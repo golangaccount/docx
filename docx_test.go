@@ -1,6 +1,7 @@
 package docx
 
 import (
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -93,4 +94,13 @@ func TestReplaceFooter(t *testing.T) {
 	if !found {
 		t.Error("Expected 'newFooter', got ", d.Headers)
 	}
+}
+
+func TestS(t *testing.T) {
+	t.Log(filepath.Ext("123.txt"))
+}
+
+func TestReplaceFile(t *testing.T) {
+	d := loadFile(testFile)
+	t.Log(d.ReplaceFile([]string{"word/media/image1.png"}, []string{"./signed.png"}, testFileResult))
 }

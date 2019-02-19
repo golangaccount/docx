@@ -9,6 +9,7 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -72,6 +73,67 @@ func (d *Docx) ReplaceLink(oldString string, newString string, num int) (err err
 	d.Links = strings.Replace(d.Links, oldString, newString, num)
 
 	return nil
+}
+
+func (d Docx) ReplaceFile(zipname, fp []string, outpath string) error {
+	if len(zipname) != len(fp) {
+		return errors.New("参数错误")
+	}
+	dir := filepath.Dir(outpath)
+	err := os.MkdirAll(dir, os.ModeDir|os.ModePerm)
+	if err != nil {
+		return err
+	}
+
+	var target *os.File
+	target, err = os.Create(outpath)
+	if err != nil {
+		return err
+	}
+	defer target.Close()
+
+	w := zip.NewWriter(target)
+	defer w.Close()
+	mark := false
+	for _, file := range d.Files {
+		mark = false
+		var writer io.Writer
+		var readCloser io.ReadCloser
+
+		writer, err = w.Create(file.Name)
+		if err != nil {
+			return err
+		}
+
+		for i, zn := range zipname {
+			if zn == file.Name {
+				mark = true
+				readCloser, err = os.Open(fp[i])
+				if err != nil {
+					return err
+				}
+			}
+		}
+		if !mark {
+			readCloser, err = file.Open()
+			if err != nil {
+				return err
+			}
+		}
+
+		if file.Name == "word/document.xml" {
+			writer.Write([]byte(d.Content))
+		} else if file.Name == "word/_rels/document.xml.rels" {
+			writer.Write([]byte(d.Links))
+		} else if strings.Contains(file.Name, "header") && d.Headers[file.Name] != "" {
+			writer.Write([]byte(d.Headers[file.Name]))
+		} else if strings.Contains(file.Name, "footer") && d.Footers[file.Name] != "" {
+			writer.Write([]byte(d.Footers[file.Name]))
+		} else {
+			writer.Write(streamToByte(readCloser))
+		}
+	}
+	return w.Close()
 }
 
 func (d *Docx) ReplaceHeader(oldString string, newString string) (err error) {
